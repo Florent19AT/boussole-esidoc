@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boussole – Assistant e-sidoc</title>
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* Palette accessible daltonnisme + DYS */
+    --bg:           #F7F6F2;
+    --surface:      #FFFFFF;
+    --surface-alt:  #EEF2F7;
+    --border:       #C8D0DC;
+    --text:         #1A1A1A;
+    --text-muted:   #4A5568;
+    --accent:       #005B99;   /* bleu sûr – pas de rouge/vert */
+    --accent-light: #D6E8F5;
+    --accent-dark:  #003F6B;
+    --bot-bubble:   #E8F1FA;
+    --user-bubble:  #1A1A1A;
+    --user-text:    #FFFFFF;
+    --chip-bg:      #FFFFFF;
+    --chip-border:  #005B99;
+    --chip-hover:   #D6E8F5;
+    --shadow:       0 2px 8px rgba(0,0,0,0.10);
+    --radius:       12px;
+    --radius-sm:    6px;
+    --font-body:    'Atkinson Hyperlegible', 'Verdana', Arial, sans-serif;
+    --font-heading: 'Atkinson Hyperlegible', 'Verdana', Arial, sans-serif;
+    --lh:           1.65;
+  }
+
+  html { font-size: 17px; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: var(--lh);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    padding: 0.9rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    box-shadow: var(--shadow);
+  }
+  .logo-icon {
+    width: 42px; height: 42px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-icon svg { width: 26px; height: 26px; }
+  header h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.03em; }
+  header p  { font-size: 0.82rem; opacity: 0.88; margin-top: 1px; }
+
+  /* ===== LAYOUT ===== */
+  .chat-wrapper {
+    width: 100%;
+    max-width: 780px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1rem 0;
+  }
+
+  /* ===== CHAT WINDOW ===== */
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 300px;
+    max-height: calc(100vh - 230px);
+    scroll-behavior: smooth;
+  }
+
+  /* ===== BUBBLES ===== */
+  .msg {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    max-width: 90%;
+    animation: fadeUp 0.22s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .msg.bot  { align-self: flex-start; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .msg.user .avatar { background: #444; }
+
+  .bubble {
+    padding: 0.65rem 1rem;
+    border-radius: var(--radius);
+    font-size: 0.97rem;
+    line-height: var(--lh);
+    max-width: 100%;
+  }
+  .msg.bot  .bubble {
+    background: var(--bot-bubble);
+    border-bottom-left-radius: 4px;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .msg.user .bubble {
+    background: var(--user-bubble);
+    color: var(--user-text);
+    border-bottom-right-radius: 4px;
+  }
+
+  .bubble p + p { margin-top: 0.45rem; }
+  .bubble ul    { padding-left: 1.2rem; margin-top: 0.3rem; }
+  .bubble li    { margin-bottom: 0.25rem; }
+  .bubble strong { font-weight: 700; }
+  .bubble em    { font-style: normal; background: #fff3cd; padding: 0 2px; border-radius: 3px; }
+  .bubble code  {
+    font-family: 'Courier New', monospace;
+    background: #e8e8e8;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.93em;
+    color: var(--text);
+  }
+  .bubble .tag  {
+    display: inline-block;
+    background: var(--accent-light);
+    color: var(--accent-dark);
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    padding: 1px 9px;
+    font-size: 0.83em;
+    font-weight: 700;
+    margin: 1px 2px;
+    letter-spacing: 0.02em;
+  }
+  .bubble table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.4rem;
+    font-size: 0.92em;
+  }
+  .bubble th, .bubble td {
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.6rem;
+    text-align: left;
+  }
+  .bubble th { background: var(--surface-alt); font-weight: 700; }
+  .bubble tr:nth-child(even) td { background: #f5f8fc; }
+
+  /* ===== CHIPS (quick replies) ===== */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding: 0.3rem 0 0.1rem 42px;
+  }
+  .chip {
+    background: var(--chip-bg);
+    border: 2px solid var(--chip-border);
+    color: var(--accent-dark);
+    border-radius: 20px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    font-family: var(--font-body);
+    line-height: 1.3;
+  }
+  .chip:hover, .chip:focus {
+    background: var(--chip-hover);
+    outline: 3px solid var(--accent);
+    outline-offset: 1px;
+    transform: translateY(-1px);
+  }
+
+  /* ===== INPUT AREA ===== */
+  .input-area {
+    background: var(--surface);
+    border-top: 2px solid var(--border);
+    padding: 0.8rem 1rem;
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-end;
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    max-width: 780px;
+    margin: 0 auto;
+  }
+  #userInput {
+    flex: 1;
+    padding: 0.65rem 0.9rem;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: var(--text);
+    background: var(--bg);
+    resize: none;
+    min-height: 46px;
+    max-height: 130px;
+    overflow-y: auto;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+  }
+  #userInput:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+  }
+  #userInput::placeholder { color: #888; }
+  #sendBtn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 1.1rem;
+    font-size: 1.1rem;
+    cursor: pointer;
+    height: 46px;
+    min-width: 46px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, transform 0.1s;
+  }
+  #sendBtn:hover, #sendBtn:focus {
+    background: var(--accent-dark);
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    transform: scale(1.04);
+  }
+  #sendBtn:active { transform: scale(0.97); }
+
+  /* ===== RESET BUTTON ===== */
+  #resetBtn {
+    background: none;
+    border: 2px solid var(--border);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    height: 46px;
+    font-family: var(--font-body);
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  #resetBtn:hover, #resetBtn:focus {
+    border-color: var(--accent);
+    color: var(--accent-dark);
+    outline: 3px solid var(--accent-light);
+    outline-offset: 1px;
+  }
+
+  /* ===== SCROLLBAR ===== */
+  #chat::-webkit-scrollbar { width: 6px; }
+  #chat::-webkit-scrollbar-track { background: transparent; }
+  #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 600px) {
+    html { font-size: 16px; }
+    .chat-wrapper { padding: 0.5rem 0.5rem 0; }
+    #chat { max-height: calc(100vh - 220px); }
+    header h1 { font-size: 1.1rem; }
+    .input-area { padding: 0.6rem 0.5rem; }
+  }
+
+  /* ===== FOCUS VISIBLE (accessibilité clavier) ===== */
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#005B99" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <polygon points="12,6 14.5,14 12,12.5 9.5,14" fill="#005B99" stroke="none"/>
+      <line x1="12" y1="12.5" x2="12" y2="18"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Boussole</h1>
+    <p>Ton assistant pour le catalogue e-sidoc du CDI</p>
+  </div>
+</header>
+
+<div class="chat-wrapper">
+  <div id="chat" role="log" aria-live="polite" aria-label="Conversation avec Boussole"></div>
+</div>
+
+<div class="input-area" role="region" aria-label="Zone de saisie">
+  <textarea
+    id="userInput"
+    placeholder="Pose ta question ou tape ta réponse…"
+    rows="1"
+    aria-label="Ton message"
+    autocomplete="off"
+    autocorrect="off"
+    spellcheck="true"
+  ></textarea>
+  <button id="resetBtn" title="Recommencer la conversation" aria-label="Recommencer">↺ Recommencer</button>
+  <button id="sendBtn" title="Envoyer" aria-label="Envoyer">&#9658;</button>
+</div>
+
+<script>
+// ============================================================
+//  BOUSSOLE – Assistant e-sidoc (sans IA externe)
+//  Lycée agricole – public 4e → BTS
+// ============================================================
+
+// ---------- Utilitaires d'affichage ----------
+const chat    = document.getElementById('chat');
+const input   = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const resetBtn= document.getElementById('resetBtn');
+
+function scrollBottom() {
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addMsg(who, html, chips) {
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${who}`;
+
+  const av = document.createElement('div');
+  av.className = 'avatar';
+  av.setAttribute('aria-hidden', 'true');
+  av.textContent = who === 'bot' ? '🧭' : 'Moi';
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.innerHTML = html;
+
+  wrap.appendChild(av);
+  wrap.appendChild(bub);
+  chat.appendChild(wrap);
+
+  if (chips && chips.length) {
+    const row = document.createElement('div');
+    row.className = 'chips';
+    chips.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'chip';
+      btn.textContent = c.label;
+      btn.setAttribute('aria-label', c.label);
+      btn.addEventListener('click', () => handleChip(c));
+      row.appendChild(btn);
+    });
+    chat.appendChild(row);
+  }
+
+  scrollBottom();
+}
+
+function addUser(text) {
+  addMsg('user', `<p>${escHtml(text)}</p>`);
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ---------- État de la conversation ----------
+let state = { step: 'accueil', data: {} };
+
+// ---------- Définitions des étapes ----------
+// Chaque étape retourne { html, chips } et met à jour state.step
+
+function goTo(step, extra) {
+  state.step = step;
+  if (extra) Object.assign(state.data, extra);
+  const r = STEPS[step]();
+  addMsg('bot', r.html, r.chips);
+}
+
+const STEPS = {
+
+  accueil: () => ({
+    html: `<p><strong>Bonjour ! Je suis Boussole 🧭</strong></p>
+           <p>Je t'aide à naviguer dans le catalogue <strong>e-sidoc</strong> du CDI.</p>
+           <p>Que veux-tu faire aujourd'hui ?</p>`,
+    chips: [
+      { label: '🔍 Trouver un document',   next: 'quoi_chercher' },
+      { label: '📖 Comprendre e-sidoc',     next: 'comprendre_esidoc' },
+      { label: '🗂️ Recherche avancée',      next: 'recherche_avancee_intro' },
+      { label: '📚 Comprendre la cote',     next: 'comprendre_cote' },
+      { label: '❓ Aide générale',           next: 'aide_generale' },
+    ]
+  }),
+
+  // ===== COMPRENDRE E-SIDOC =====
+  comprendre_esidoc: () => ({
+    html: `<p><strong>Qu'est-ce que e-sidoc ?</strong></p>
+           <p>e-sidoc est le <strong>catalogue en ligne du CDI</strong>. Il regroupe :</p>
+           <ul>
+             <li>📚 Les <strong>livres documentaires</strong> (classés selon la classification Dewey)</li>
+             <li>📖 Les <strong>fictions</strong> (romans, contes, BD, mangas, poésie, théâtre, albums, nouvelles)</li>
+             <li>🌐 Des <strong>sites web sélectionnés</strong> par le/la documentaliste</li>
+             <li>📰 Des <strong>périodiques</strong> (magazines, revues)</li>
+           </ul>
+           <p>Les documents sont indexés avec le vocabulaire <strong>Rameau</strong> (mots-clés officiels).</p>`,
+    chips: [
+      { label: '🔍 Faire une recherche simple', next: 'recherche_simple_intro' },
+      { label: '🗂️ Faire une recherche avancée', next: 'recherche_avancee_intro' },
+      { label: '🏠 Retour au début', next: 'accueil' },
+    ]
+  }),
+
+  // ===== AIDE GÉNÉRALE =====
+  aide_generale: () => ({
+    html: `<p>Je peux t'aider sur plusieurs points :</p>
+           <ul>
+             <li>Trouver un <strong>livre, site ou magazine</strong> dans le catalogue</li>
+             <li>Comprendre comment fonctionne une <strong>recherche simple ou avancée</strong></li>
+             <li>Lire et localiser une <strong>cote</strong> (l'adresse d'un document en rayon)</li>
+             <li>Connaître les <strong>types de documents</strong> disponibles au CDI</li>
+           </ul>
+           <p>Par quoi veux-tu commencer ?</p>`,
+    chips: [
+      { label: '🔍 Recherche simple',     next: 'recherche_simple_intro' },
+      { label: '🗂️ Recherche avancée',    next: 'recherche_avancee_intro' },
+      { label: '📚 Comprendre la cote',   next: 'comprendre_cote' },
+      { label: '📖 C\'est quoi e-sidoc ?', next: 'comprendre_esidoc' },
+    ]
+  }),
+
+  // ===== QUOI CHERCHER =====
+  quoi_chercher: () => ({
+    html: `<p>Qu'est-ce que tu cherches ?</p>`,
+    chips: [
+      { label: '📚 Un livre (roman, BD, manga…)', next: 'type_fiction' },
+      { label: '📘 Un livre documentaire',         next: 'type_doc' },
+      { label: '🌐 Un site web',                   next: 'type_site' },
+      { label: '📰 Un magazine / périodique',       next: 'type_perio' },
+      { label: '🤷 Je ne sais pas encore',          next: 'conseil_start' },
+    ]
+  }),
+
+  // ===== FICTION =====
+  type_fiction: () => ({
+    html: `<p>Quelle catégorie de fiction cherches-tu ?</p>`,
+    chips: [
+      { label: 'Roman',    next: 'fiction_roman' },
+      { label: 'Conte',    next: 'fiction_conte' },
+      { label: 'BD',       next: 'fiction_bd' },
+      { label: 'Manga',    next: 'fiction_manga' },
+      { label: 'Poésie',   next: 'fiction_poesie' },
+      { label: 'Théâtre',  next: 'fiction_theatre' },
+      { label: 'Album',    next: 'fiction_album' },
+      { label: 'Nouvelle', next: 'fiction_nouvelle' },
+    ]
+  }),
+
+  fiction_roman: () => ({
+    html: fictionHelp('Roman', 'R'),
+    chips: chipsRecherche()
+  }),
+  fiction_conte: () => ({
+    html: fictionHelp('Conte', 'C'),
+    chips: chipsRecherche()
+  }),
+  fiction_bd: () => ({
+    html: fictionHelp('Bande dessinée', 'BD'),
+    chips: chipsRecherche()
+  }),
+  fiction_manga: () => ({
+    html: fictionHelp('Manga', 'M', true),
+    chips: chipsRecherche()
+  }),
+  fiction_poesie: () => ({
+    html: fictionHelp('Poésie', 'P'),
+    chips: chipsRecherche()
+  }),
+  fiction_theatre: () => ({
+    html: fictionHelp('Théâtre', 'TH'),
+    chips: chipsRecherche()
+  }),
+  fiction_album: () => ({
+    html: fictionHelp('Album', 'AL'),
+    chips: chipsRecherche()
+  }),
+  fiction_nouvelle: () => ({
+    html: fictionHelp('Nouvelle', 'NO'),
+    chips: chipsRecherche()
+  }),
+
+  // ===== DOC =====
+  type_doc: () => ({
+    html: `<p><strong>Les livres documentaires</strong> sont classés selon la <strong>classification Dewey</strong>.</p>
+           <p>Chaque livre a une cote composée du <strong>numéro Dewey</strong> (de 000 à 999) suivi des 3 premières lettres de l'auteur ou du titre.</p>
+           ${deweyTable()}
+           <p>💡 <strong>Conseil :</strong> Dans e-sidoc, utilise les mots-clés du vocabulaire <strong>Rameau</strong> pour trouver plus facilement. Par exemple : tape <em>élevage bovin</em> plutôt que <em>vaches</em>.</p>`,
+    chips: chipsRecherche()
+  }),
+
+  // ===== SITE WEB =====
+  type_site: () => ({
+    html: `<p>e-sidoc contient des <strong>sites web sélectionnés</strong> par le/la documentaliste du CDI.</p>
+           <p>Pour les trouver :</p>
+           <ul>
+             <li>Fais une <strong>recherche par mot-clé</strong> dans e-sidoc</li>
+             <li>Dans les résultats, filtre par <strong>type de document → Site web</strong></li>
+           </ul>
+           <p>💡 Ces sites ont été vérifiés et sont fiables pour tes recherches scolaires.</p>`,
+    chips: chipsRecherche()
+  }),
+
+  // ===== PÉRIODIQUE =====
+  type_perio: () => ({
+    html: `<p>e-sidoc référence les <strong>périodiques</strong> (magazines, revues…) du CDI.</p>
+           <p>Pour les trouver :</p>
+           <ul>
+             <li>Tape le <strong>nom du magazine</strong> dans la barre de recherche</li>
+             <li>Ou filtre par <strong>type de document → Périodique</strong></li>
+             <li>Tu peux aussi chercher par <strong>thème</strong> (ex. : <em>agriculture</em>) et filtrer ensuite</li>
+           </ul>`,
+    chips: chipsRecherche()
+  }),
+
+  // ===== CONSEIL START =====
+  conseil_start: () => ({
+    html: `<p>Pas de problème ! Dis-moi <strong>le sujet ou le thème</strong> qui t'intéresse et je t'oriente.</p>
+           <p>Tu peux :</p>
+           <ul>
+             <li>Taper un <strong>mot-clé</strong> ci-dessous (ex. : <em>agroécologie</em>, <em>roman policier</em>)</li>
+             <li>Ou choisir un domaine :</li>
+           </ul>`,
+    chips: [
+      { label: '🌿 Agriculture / Environnement', next: 'theme_agri' },
+      { label: '📖 Littérature / Fiction',       next: 'type_fiction' },
+      { label: '🧬 Sciences',                    next: 'theme_sciences' },
+      { label: '🌍 Géographie / Histoire',       next: 'theme_geo' },
+      { label: '💼 Économie / Gestion',          next: 'theme_eco' },
+    ]
+  }),
+
+  theme_agri: () => ({
+    html: `<p>Pour le domaine <strong>Agriculture / Environnement</strong>, tu trouveras des ressources en :</p>
+           <ul>
+             <li><span class="tag">Dewey 630</span> Agriculture générale</li>
+             <li><span class="tag">Dewey 636</span> Élevage et zootechnie</li>
+             <li><span class="tag">Dewey 632</span> Maladies des plantes, parasitologie</li>
+             <li><span class="tag">Dewey 634</span> Arboriculture, viticulture</li>
+             <li><span class="tag">Dewey 363</span> Environnement, écologie</li>
+           </ul>
+           <p>💡 Essaie des mots Rameau comme : <em>agroécologie, biodiversité, agriculture durable, élevage bovin…</em></p>`,
+    chips: chipsRecherche()
+  }),
+
+  theme_sciences: () => ({
+    html: `<p>Pour les <strong>Sciences</strong> :</p>
+           <ul>
+             <li><span class="tag">Dewey 500</span> Sciences pures</li>
+             <li><span class="tag">Dewey 510</span> Mathématiques</li>
+             <li><span class="tag">Dewey 530</span> Physique</li>
+             <li><span class="tag">Dewey 540</span> Chimie</li>
+             <li><span class="tag">Dewey 570</span> Biologie, sciences du vivant</li>
+             <li><span class="tag">Dewey 590</span> Zoologie</li>
+           </ul>`,
+    chips: chipsRecherche()
+  }),
+
+  theme_geo: () => ({
+    html: `<p>Pour <strong>Géographie / Histoire</strong> :</p>
+           <ul>
+             <li><span class="tag">Dewey 900</span> Histoire et géographie</li>
+             <li><span class="tag">Dewey 910</span> Géographie, voyages</li>
+             <li><span class="tag">Dewey 940</span> Histoire de l'Europe</li>
+             <li><span class="tag">Dewey 944</span> Histoire de France</li>
+           </ul>`,
+    chips: chipsRecherche()
+  }),
+
+  theme_eco: () => ({
+    html: `<p>Pour <strong>Économie / Gestion</strong> :</p>
+           <ul>
+             <li><span class="tag">Dewey 330</span> Économie</li>
+             <li><span class="tag">Dewey 338</span> Production, économie agricole</li>
+             <li><span class="tag">Dewey 650</span> Gestion, management</li>
+             <li><span class="tag">Dewey 657</span> Comptabilité</li>
+           </ul>`,
+    chips: chipsRecherche()
+  }),
+
+  // ===== RECHERCHE SIMPLE =====
+  recherche_simple_intro: () => ({
+    html: `<p><strong>Recherche simple dans e-sidoc</strong> 🔍</p>
+           <p>La barre de recherche principale se trouve en <strong>haut de la page d'accueil</strong> d'e-sidoc.</p>
+           <p><strong>Comment ça marche :</strong></p>
+           <ul>
+             <li>Tape un ou plusieurs <strong>mots-clés</strong></li>
+             <li>Tu peux chercher par <strong>titre, auteur, sujet ou ISBN</strong></li>
+             <li>Appuie sur <strong>Entrée</strong> ou clique sur la loupe</li>
+           </ul>
+           <p>💡 <strong>Astuce :</strong> utilise des termes <strong>Rameau</strong> pour de meilleurs résultats (vocabulaire documentaire officiel).</p>`,
+    chips: [
+      { label: '💡 Exemples de recherches',         next: 'exemples_recherche' },
+      { label: '🗂️ Passer en recherche avancée',    next: 'recherche_avancee_intro' },
+      { label: '🔤 C\'est quoi Rameau ?',            next: 'rameau_explication' },
+      { label: '📋 Filtrer les résultats',           next: 'filtrer_resultats' },
+      { label: '🏠 Retour au début',                 next: 'accueil' },
+    ]
+  }),
+
+  exemples_recherche: () => ({
+    html: `<p><strong>Quelques exemples de recherches :</strong></p>
+           <table>
+             <thead><tr><th>Ce que tu veux</th><th>Ce que tu tapes</th></tr></thead>
+             <tbody>
+               <tr><td>Un roman de Victor Hugo</td><td><code>Hugo Victor</code> ou <code>Les Misérables</code></td></tr>
+               <tr><td>Des infos sur l'apiculture</td><td><code>apiculture</code> ou <code>abeilles élevage</code></td></tr>
+               <tr><td>Un magazine sur l'agronomie</td><td><code>agronomie</code> → filtrer périodiques</td></tr>
+               <tr><td>Des sites sur le changement climatique</td><td><code>changement climatique</code> → filtrer sites web</td></tr>
+               <tr><td>Un livre sur la gestion d'entreprise</td><td><code>gestion entreprise agricole</code></td></tr>
+             </tbody>
+           </table>`,
+    chips: [
+      { label: '🗂️ Recherche avancée',  next: 'recherche_avancee_intro' },
+      { label: '📋 Filtrer',            next: 'filtrer_resultats' },
+      { label: '🏠 Retour au début',    next: 'accueil' },
+    ]
+  }),
+
+  rameau_explication: () => ({
+    html: `<p><strong>Qu'est-ce que le vocabulaire Rameau ?</strong></p>
+           <p>Rameau est un <strong>vocabulaire documentaire officiel</strong> utilisé par les bibliothèques françaises.</p>
+           <p>Les documentalistes <strong>indexent</strong> chaque document avec des mots Rameau précis.</p>
+           <p><strong>Exemples :</strong></p>
+           <ul>
+             <li>Au lieu de <em>vaches</em> → tape <em>bovins</em></li>
+             <li>Au lieu de <em>fleurs</em> → tape <em>horticulture</em> ou <em>floriculture</em></li>
+             <li>Au lieu de <em>poissons d'élevage</em> → tape <em>aquaculture</em></li>
+             <li>Au lieu de <em>arbres fruitiers</em> → tape <em>arboriculture fruitière</em></li>
+           </ul>
+           <p>💡 Si tu ne trouves rien, essaie un <strong>terme plus général ou différent</strong>.</p>`,
+    chips: [
+      { label: '🔍 Refaire une recherche',  next: 'recherche_simple_intro' },
+      { label: '🗂️ Recherche avancée',      next: 'recherche_avancee_intro' },
+      { label: '🏠 Retour au début',         next: 'accueil' },
+    ]
+  }),
+
+  filtrer_resultats: () => ({
+    html: `<p><strong>Filtrer les résultats dans e-sidoc</strong></p>
+           <p>Après une recherche, tu peux affiner les résultats avec les <strong>filtres à gauche</strong> :</p>
+           <ul>
+             <li><strong>Type de document</strong> : livre, périodique, site web, DVD…</li>
+             <li><strong>Langue</strong></li>
+             <li><strong>Date</strong> de parution</li>
+             <li><strong>Sujet / thème</strong> Rameau</li>
+             <li><strong>Localisation</strong> (si plusieurs CDI)</li>
+           </ul>
+           <p>Coche les filtres qui t'intéressent pour réduire la liste. Tu peux en combiner plusieurs.</p>`,
+    chips: [
+      { label: '🗂️ Recherche avancée',  next: 'recherche_avancee_intro' },
+      { label: '📚 Comprendre la cote', next: 'comprendre_cote' },
+      { label: '🏠 Retour au début',    next: 'accueil' },
+    ]
+  }),
+
+  // ===== RECHERCHE AVANCÉE =====
+  recherche_avancee_intro: () => ({
+    html: `<p><strong>Recherche avancée dans e-sidoc</strong> 🗂️</p>
+           <p>La recherche avancée te permet de <strong>combiner plusieurs critères</strong> pour trouver exactement ce que tu cherches.</p>
+           <p>Clique sur <strong>"Recherche avancée"</strong> (lien sous la barre de recherche principale ou dans le menu).</p>
+           <p>Sur quels critères veux-tu des explications ?</p>`,
+    chips: [
+      { label: '📝 Titre',           next: 'ra_titre' },
+      { label: '✍️ Auteur',          next: 'ra_auteur' },
+      { label: '🏷️ Sujet / mot-clé', next: 'ra_sujet' },
+      { label: '📅 Année',           next: 'ra_annee' },
+      { label: '📦 Type de document',next: 'ra_type' },
+      { label: '🔗 Combiner plusieurs critères', next: 'ra_combiner' },
+      { label: '💡 Exemple complet', next: 'ra_exemple' },
+    ]
+  }),
+
+  ra_titre: () => ({
+    html: `<p><strong>Critère : Titre</strong></p>
+           <ul>
+             <li>Tape le <strong>titre exact ou partiel</strong> dans le champ "Titre"</li>
+             <li>Ex. : <code>Les Misérables</code> ou juste <code>Misérables</code></li>
+             <li>Tu peux utiliser le <strong>joker *</strong> : <code>Agri*</code> trouvera <em>Agriculture</em>, <em>Agronomie</em>…</li>
+           </ul>`,
+    chips: chipsRA()
+  }),
+
+  ra_auteur: () => ({
+    html: `<p><strong>Critère : Auteur</strong></p>
+           <ul>
+             <li>Tape le <strong>nom de l'auteur</strong> (puis prénom si besoin)</li>
+             <li>Format conseillé : <code>Zola Émile</code> ou juste <code>Zola</code></li>
+             <li>Pour les collectifs ou organismes : tape le nom de l'organisme</li>
+           </ul>`,
+    chips: chipsRA()
+  }),
+
+  ra_sujet: () => ({
+    html: `<p><strong>Critère : Sujet / Mot-clé</strong></p>
+           <ul>
+             <li>C'est le critère le plus puissant pour les <strong>recherches thématiques</strong></li>
+             <li>Utilise des termes <strong>Rameau</strong> (vocabulaire documentaire)</li>
+             <li>Ex. : <code>Agriculture biologique</code>, <code>Élevage -- France</code>, <code>Développement durable</code></li>
+             <li>Le <strong>joker *</strong> est autorisé : <code>écolog*</code> → écologie, écologique…</li>
+           </ul>
+           <p>💡 Si tu ne trouves rien, essaie un terme plus général.</p>`,
+    chips: chipsRA()
+  }),
+
+  ra_annee: () => ({
+    html: `<p><strong>Critère : Année de publication</strong></p>
+           <ul>
+             <li>Tape une <strong>année précise</strong> ou une <strong>fourchette</strong> (ex. : 2018 – 2024)</li>
+             <li>Utile pour trouver des documents <strong>récents</strong> sur un sujet</li>
+           </ul>`,
+    chips: chipsRA()
+  }),
+
+  ra_type: () => ({
+    html: `<p><strong>Critère : Type de document</strong></p>
+           <p>Tu peux limiter ta recherche à un type précis :</p>
+           <ul>
+             <li>📚 <strong>Monographie</strong> = livre</li>
+             <li>📰 <strong>Périodique</strong> = magazine, revue</li>
+             <li>🌐 <strong>Ressource en ligne</strong> = site web</li>
+             <li>🎬 <strong>Document audiovisuel</strong> = DVD, vidéo</li>
+           </ul>`,
+    chips: chipsRA()
+  }),
+
+  ra_combiner: () => ({
+    html: `<p><strong>Combiner plusieurs critères</strong></p>
+           <p>Dans la recherche avancée, tu peux utiliser les opérateurs <strong>ET / OU / SAUF</strong> :</p>
+           <table>
+             <thead><tr><th>Opérateur</th><th>Effet</th><th>Exemple</th></tr></thead>
+             <tbody>
+               <tr><td><strong>ET</strong></td><td>Les deux termes doivent être présents</td><td><code>élevage ET bovin</code></td></tr>
+               <tr><td><strong>OU</strong></td><td>L'un ou l'autre (plus de résultats)</td><td><code>vache OU bovin</code></td></tr>
+               <tr><td><strong>SAUF</strong></td><td>Exclure un terme</td><td><code>agriculture SAUF biologique</code></td></tr>
+             </tbody>
+           </table>
+           <p>💡 Commence large (OU), puis affine (ET) si tu as trop de résultats.</p>`,
+    chips: chipsRA()
+  }),
+
+  ra_exemple: () => ({
+    html: `<p><strong>Exemple de recherche avancée complète</strong></p>
+           <p><em>Situation : tu prépares un exposé sur l'agroforesterie en France depuis 2015.</em></p>
+           <ol style="padding-left:1.2rem;margin-top:0.3rem">
+             <li>Champ <strong>Sujet</strong> : <code>agroforesterie</code></li>
+             <li>Champ <strong>Sujet</strong> (2e ligne, opérateur <strong>ET</strong>) : <code>France</code></li>
+             <li>Champ <strong>Année</strong> : <code>2015</code> à <code>2024</code></li>
+             <li>Type de document : <strong>Tous</strong> (ou "Monographie" si tu veux seulement des livres)</li>
+             <li>Clique sur <strong>Rechercher</strong></li>
+           </ol>
+           <p>Tu obtiens les documents du CDI sur ce sujet précis !</p>`,
+    chips: [
+      { label: '🔍 Recherche simple',  next: 'recherche_simple_intro' },
+      { label: '📚 Comprendre la cote', next: 'comprendre_cote' },
+      { label: '🏠 Retour au début',    next: 'accueil' },
+    ]
+  }),
+
+  // ===== COMPRENDRE LA COTE =====
+  comprendre_cote: () => ({
+    html: `<p><strong>La cote : l'adresse d'un document en rayon</strong> 📍</p>
+           <p>Chaque document a une <strong>cote</strong> qui t'indique où le trouver dans le CDI.</p>
+           <p>Il existe deux types de cotes :</p>`,
+    chips: [
+      { label: '📘 Cote documentaire (Dewey)',  next: 'cote_dewey' },
+      { label: '📖 Cote fiction',               next: 'cote_fiction' },
+      { label: '🏠 Retour au début',             next: 'accueil' },
+    ]
+  }),
+
+  cote_dewey: () => ({
+    html: `<p><strong>Cote d'un documentaire (classification Dewey)</strong></p>
+           <p>Format : <code>NNN NOM</code></p>
+           <p>Exemple : <code>636 DUP</code> → livre sur l'élevage (<span class="tag">636</span>), auteur Dupont (<span class="tag">DUP</span>)</p>
+           ${deweyTable()}
+           <p>Les livres sont rangés par <strong>ordre croissant de numéro</strong>, puis alphabétiquement par les 3 lettres.</p>`,
+    chips: [
+      { label: '📖 Cote fiction',     next: 'cote_fiction' },
+      { label: '🔍 Faire une recherche', next: 'recherche_simple_intro' },
+      { label: '🏠 Retour au début',  next: 'accueil' },
+    ]
+  }),
+
+  cote_fiction: () => ({
+    html: `<p><strong>Cote d'une fiction</strong></p>
+           <p>Format : <span class="tag">PRÉFIXE</span> + <code>3 premières lettres du nom d'auteur</code></p>
+           <table>
+             <thead><tr><th>Type</th><th>Préfixe</th><th>Exemple</th></tr></thead>
+             <tbody>
+               <tr><td>Roman</td><td><span class="tag">R</span></td><td><code>R ZOL</code> (Zola)</td></tr>
+               <tr><td>Conte</td><td><span class="tag">C</span></td><td><code>C PER</code> (Perrault)</td></tr>
+               <tr><td>Bande dessinée</td><td><span class="tag">BD</span></td><td><code>BD GOT</code> (Goscinny)</td></tr>
+               <tr><td>Manga</td><td><span class="tag">M</span></td><td><code>M MIY</code> (Miyazaki)</td></tr>
+               <tr><td>Poésie</td><td><span class="tag">P</span></td><td><code>P RIM</code> (Rimbaud)</td></tr>
+               <tr><td>Théâtre</td><td><span class="tag">TH</span></td><td><code>TH MOL</code> (Molière)</td></tr>
+               <tr><td>Album</td><td><span class="tag">AL</span></td><td><code>AL LOR</code></td></tr>
+               <tr><td>Nouvelle</td><td><span class="tag">NO</span></td><td><code>NO MAU</code> (Maupassant)</td></tr>
+             </tbody>
+           </table>
+           <p>Les fictions sont rangées <strong>alphabétiquement</strong> par les 3 lettres, dans chaque section.</p>`,
+    chips: [
+      { label: '📘 Cote documentaire', next: 'cote_dewey' },
+      { label: '🔍 Faire une recherche', next: 'recherche_simple_intro' },
+      { label: '🏠 Retour au début',   next: 'accueil' },
+    ]
+  }),
+
+};
+
+// ---------- Helpers ----------
+function fictionHelp(type, prefix, isManga) {
+  const ex = isManga ? 'Miyazaki → M MIY' : (prefix === 'R' ? 'Zola → R ZOL' : `Auteur → ${prefix} AUT`);
+  return `<p><strong>${type}</strong></p>
+          <p>Les ${type.toLowerCase()}s ont une cote formée du préfixe <span class="tag">${prefix}</span> suivi des <strong>3 premières lettres du nom de l'auteur</strong>.</p>
+          <p>Exemple : <code>${ex}</code></p>
+          <p><strong>Pour le trouver dans e-sidoc :</strong></p>
+          <ul>
+            <li>Tape le <strong>nom de l'auteur</strong> dans la recherche</li>
+            <li>Ou tape le <strong>titre</strong> si tu le connais</li>
+            <li>Filtre par <strong>type de document → Fiction</strong> si besoin</li>
+          </ul>`;
+}
+
+function deweyTable() {
+  return `<table>
+    <thead><tr><th>Indice Dewey</th><th>Domaine</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag">000</span></td><td>Informatique, généralités</td></tr>
+      <tr><td><span class="tag">100</span></td><td>Philosophie, psychologie</td></tr>
+      <tr><td><span class="tag">200</span></td><td>Religion</td></tr>
+      <tr><td><span class="tag">300</span></td><td>Sciences sociales, droit, économie</td></tr>
+      <tr><td><span class="tag">400</span></td><td>Langues, linguistique</td></tr>
+      <tr><td><span class="tag">500</span></td><td>Sciences pures, mathématiques</td></tr>
+      <tr><td><span class="tag">600</span></td><td>Techniques, agriculture, médecine</td></tr>
+      <tr><td><span class="tag">630</span></td><td>Agriculture, élevage</td></tr>
+      <tr><td><span class="tag">700</span></td><td>Arts, sports, loisirs</td></tr>
+      <tr><td><span class="tag">800</span></td><td>Littérature</td></tr>
+      <tr><td><span class="tag">900</span></td><td>Histoire, géographie</td></tr>
+    </tbody>
+  </table>`;
+}
+
+function chipsRecherche() {
+  return [
+    { label: '🔍 Recherche simple',     next: 'recherche_simple_intro' },
+    { label: '🗂️ Recherche avancée',    next: 'recherche_avancee_intro' },
+    { label: '📚 Comprendre la cote',   next: 'comprendre_cote' },
+    { label: '🏠 Retour au début',       next: 'accueil' },
+  ];
+}
+
+function chipsRA() {
+  return [
+    { label: '📝 Titre',               next: 'ra_titre' },
+    { label: '✍️ Auteur',             next: 'ra_auteur' },
+    { label: '🏷️ Sujet',              next: 'ra_sujet' },
+    { label: '🔗 Combiner critères',   next: 'ra_combiner' },
+    { label: '💡 Exemple complet',     next: 'ra_exemple' },
+    { label: '🏠 Retour au début',     next: 'accueil' },
+  ];
+}
+
+// ---------- Gestion des chips et de la saisie ----------
+function handleChip(chip) {
+  if (chip.next) {
+    addUser(chip.label);
+    removeChips();
+    goTo(chip.next);
+  }
+}
+
+function removeChips() {
+  document.querySelectorAll('.chips').forEach(el => el.remove());
+}
+
+function handleFreeText(text) {
+  text = text.trim();
+  if (!text) return;
+  addUser(text);
+  removeChips();
+  const lower = text.toLowerCase();
+
+  // Détecter l'intention depuis la saisie libre
+  if (/(roman|fiction|conte|bd|manga|bande dessin)/i.test(lower))       { goTo('type_fiction'); return; }
+  if (/(documentaire|dewey|non.fiction|essai)/i.test(lower))             { goTo('type_doc');     return; }
+  if (/(site web|internet|ressource en ligne|web)/i.test(lower))         { goTo('type_site');    return; }
+  if (/(magazine|périodique|revue|journal)/i.test(lower))                { goTo('type_perio');   return; }
+  if (/(cote|rayon|localiser|trouver en rayon)/i.test(lower))            { goTo('comprendre_cote'); return; }
+  if (/(dewey)/i.test(lower))                                             { goTo('cote_dewey');   return; }
+  if (/(rameau)/i.test(lower))                                            { goTo('rameau_explication'); return; }
+  if (/(recherche avancée|critère|combiner|opérateur)/i.test(lower))     { goTo('recherche_avancee_intro'); return; }
+  if (/(recherche simple|comment chercher|comment trouver)/i.test(lower)){ goTo('recherche_simple_intro'); return; }
+  if (/(qu.est.ce|c.est quoi|e.sidoc|esidoc)/i.test(lower))             { goTo('comprendre_esidoc'); return; }
+  if (/(filtr|affin|trier résultat)/i.test(lower))                       { goTo('filtrer_resultats'); return; }
+  if (/(agri|élevage|plant|rural|forêt|agroforest)/i.test(lower))        { goTo('theme_agri');   return; }
+  if (/(science|bio|chimie|physique|math)/i.test(lower))                 { goTo('theme_sciences'); return; }
+  if (/(histoire|géo|europe|france|monde)/i.test(lower))                 { goTo('theme_geo');    return; }
+  if (/(économie|gestion|compta|management|entreprise)/i.test(lower))    { goTo('theme_eco');    return; }
+  if (/(bonjour|salut|hello|coucou)/i.test(lower))                       { goTo('accueil');      return; }
+  if (/(aide|help|comment|perdu)/i.test(lower))                          { goTo('aide_generale'); return; }
+
+  // Réponse par défaut
+  addMsg('bot',
+    `<p>Je n'ai pas bien compris ta demande 🤔</p>
+     <p>Tu peux choisir parmi les options ci-dessous, ou reformuler ta question.</p>
+     <p>💡 Essaie par exemple : <em>"Je cherche un roman"</em>, <em>"Comment faire une recherche avancée ?"</em> ou <em>"C'est quoi une cote ?"</em></p>`,
+    [
+      { label: '🔍 Recherche simple',     next: 'recherche_simple_intro' },
+      { label: '🗂️ Recherche avancée',    next: 'recherche_avancee_intro' },
+      { label: '📚 Comprendre la cote',   next: 'comprendre_cote' },
+      { label: '🏠 Retour au début',       next: 'accueil' },
+    ]
+  );
+}
+
+// ---------- Envoi ----------
+function sendMessage() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = 'auto';
+  handleFreeText(text);
+}
+
+sendBtn.addEventListener('click', sendMessage);
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Auto-resize textarea
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 130) + 'px';
+});
+
+// Reset
+resetBtn.addEventListener('click', () => {
+  chat.innerHTML = '';
+  state = { step: 'accueil', data: {} };
+  input.value = '';
+  goTo('accueil');
+});
+
+// ---------- Démarrage ----------
+goTo('accueil');
+</script>
+</body>
+</html>
